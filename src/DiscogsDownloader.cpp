@@ -498,12 +498,12 @@ std::string DiscogsAlbumInfo::getGenre() const // combination of m_strGenre and 
 
 
 
-/*static*/ const char* DiscogsDownloader::SOURCE_NAME ("Discogs");
+/*static*/ const char* DiscogsDownloader::SOURCE_NAME ("Discogs"); // !!! non-translatable
 
 
 DiscogsDownloader::DiscogsDownloader(QWidget* pParent, SessionSettings& settings, bool bSaveResults) : AlbumInfoDownloaderDlgImpl(pParent, settings, bSaveResults)
 {
-    setWindowTitle("Download album data from Discogs.com");
+    setWindowTitle(tr("Download album data from Discogs.com"));
 
     int nWidth, nHeight, nStyleOption;
     m_settings.loadDiscogsSettings(nWidth, nHeight, nStyleOption);
@@ -526,12 +526,12 @@ DiscogsDownloader::DiscogsDownloader(QWidget* pParent, SessionSettings& settings
     {
         QStringList l;
         //l << "< don't use >" << "Genre1, Genre2, ... , Style1, Style2, ..." << "Genre1, Genre2, ... (Style1, Style2, ...)" << "Style1, Style2, ...";
-        l << "Genres" << "Genres, Styles" << "Genres (Styles)" << "Styles";
+        l << tr("Genres") << tr("Genres, Styles") << tr("Genres (Styles)") << tr("Styles");
         m_pStyleCbB->addItems(l);
         m_pStyleCbB->setCurrentIndex(nStyleOption);
     }
 
-    m_pQHttp->setHost("www.discogs.com");
+    m_pQHttp->setHost("api.discogs.com");
 
     m_pModel = new WebDwnldModel(*this, *m_pTrackListG); // !!! in a way these would make sense to be in the base constructor, but that would cause calls to pure virtual methods
     m_pTrackListG->setModel(m_pModel);
@@ -573,7 +573,7 @@ LAST_STEP("DiscogsDownloader::initSearch");
 {
 LAST_STEP("DiscogsDownloader::createQuery");
     //string s (strArtist + "+" + strAlbum);
-    string s ("/search?type=all&q=" + replaceSymbols(convStr(m_pSrchArtistE->text())) + "&f=xml&api_key=f51e9c8f6c");
+    string s ("/search?q=" + replaceSymbols(convStr(m_pSrchArtistE->text())) + "&f=xml");
     for (string::size_type i = 0; i < s.size(); ++i)
     {
         if (' ' == s[i])
@@ -616,13 +616,38 @@ LAST_STEP("DiscogsDownloader::loadNextPage");
     sprintf(a, "&page=%d", m_nLastLoadedPage + 1);
     string s (m_strQuery + a);
 
-    QHttpRequestHeader header ("GET", convStr(s));
-    header.setValue("Host", "www.discogs.com");
+    QHttpRequestHeader header ("GET", convStr(s)); // ttt1 QHttpRequestHeader and QHttp are deprecated, to be replaced by QNetworkAccessManager
+    header.setValue("Host", "api.discogs.com"); // ttt1 Discogs API v1 is deprecated; switch to v2: http://api.discogs.com/search?q=abba&f=xml vs http://www.discogs.com/search?type=all&q=abba&f=xml&api_key=f51e9c8f6c // see http://www.discogs.com/help/forums/topic/234138
+    //header.setValue("Host", "api.discogs.com");
     header.setValue("Accept-Encoding", "gzip");
+    //header.setValue("User-Agent" , "Mozilla Firefox");
+    header.setValue("User-Agent" , "Mp3Diags");
 
     m_pQHttp->request(header);
     //cout << "sent search " << m_pQHttp->request(header) << " for page " << (m_nLastLoadedPage + 1) << endl;
 }
+
+/*
+http://www.discogs.com/help/api
+
+http://www.discogs.com/developers/
+http://www.discogs.com/developers/accessing.html
+http://www.discogs.com/developers/resources/database/index.html
+http://www.discogs.com/developers/resources/database/artist.html
+
+http://api.discogs.com/release/1
+
+http://www.discogs.com/developers/resources/database/image.html
+
+http://www.discogs.com/developers/resources/database/search-endpoint.html
+http://api.discogs.com/database/search?artist=coldplay
+
+
+http://qtwiki.org/Parsing_JSON_with_QT_using_standard_QT_library
+http://nilier.blogspot.com/2010/08/json-parser-class-for-qt.html?spref=tw   http://ereilin.tumblr.com/post/6857765046/lightweight-json-parser-serializer-class-for-qt   https://github.com/ereilin/qt-json
+
+http://www.discogs.com/help/forums/topic/326725  - future of XML, JSON-only features
+*/
 
 
 void DiscogsDownloader::reloadGui()
@@ -637,6 +662,7 @@ LAST_STEP("DiscogsDownloader::reloadGui");
 
 
 
+//http://api.discogs.com/release/1565272?f=xml vs http://www.discogs.com/release/1565272?f=xml&api_key=f51e9c8f6c
 void DiscogsDownloader::requestAlbum(int nAlbum)
 {
 LAST_STEP("DiscogsDownloader::requestAlbum");
@@ -644,17 +670,18 @@ LAST_STEP("DiscogsDownloader::requestAlbum");
 
     m_nLoadingAlbum = nAlbum;
     setWaiting(ALBUM);
-    string s ("/release/" + m_vAlbums[nAlbum].m_strId + "?f=xml&api_key=f51e9c8f6c");
+    string s ("/release/" + m_vAlbums[nAlbum].m_strId + "?f=xml");
 
     QHttpRequestHeader header ("GET", convStr(s));
-    header.setValue("Host", "www.discogs.com");
+    header.setValue("Host", "api.discogs.com");
     header.setValue("Accept-Encoding", "gzip");
+    header.setValue("User-Agent" , "Mp3Diags");
     m_pQHttp->request(header);
     //cout << "sent album " << m_vAlbums[nAlbum].m_strId << " - " << m_pQHttp->request(header) << endl;
-    addNote("getting album info ...");
+    addNote(AlbumInfoDownloaderDlgImpl::tr("getting album info ..."));
 }
 
-
+//http://api.discogs.com/image/R-1565272-1228883740.jpeg vs http://www.discogs.com/image/R-1565272-1228883740.jpeg?api_key=f51e9c8f6c
 void DiscogsDownloader::requestImage(int nAlbum, int nImage)
 {
 LAST_STEP("DiscogsDownloader::requestImage");
@@ -665,15 +692,16 @@ LAST_STEP("DiscogsDownloader::requestImage");
     const string& strName (m_vAlbums[nAlbum].m_vstrImageNames[nImage]);
     setImageType(strName);
 
-    string s ("/image/" + strName + "?api_key=f51e9c8f6c");
+    string s ("/image/" + strName);
 //cout << "  get img " << s << endl;
 
     QHttpRequestHeader header ("GET", convStr(s));
-    header.setValue("Host", "www.discogs.com");
+    header.setValue("Host", "api.discogs.com");
     //header.setValue("Accept-Encoding", "gzip");
+    header.setValue("User-Agent" , "Mp3Diags");
     m_pQHttp->request(header);
     //cout << "sent img " <<  m_vAlbums[nAlbum].m_vstrImageNames[nImage] << " - " << m_pQHttp->request(header) << endl;
-    addNote("getting image ...");
+    addNote(AlbumInfoDownloaderDlgImpl::tr("getting image ..."));
 }
 
 
@@ -727,5 +755,4 @@ LAST_STEP("DiscogsDownloader::getWaitingHttp");
 }
 
 
-//ttt0 downloading multi-volume info saves track numbers as A1, A2, ... B1, B2, ... These are not valid and cannot be entered manually; should probably be converted to 1,2, ... (which apparently happens when saving a single volume from a multi-volume album); see https://sourceforge.net/projects/mp3diags/forums/forum/947206/topic/4503061/index/page/1
 
